@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#050a0e" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PolyBot" />
+  <meta name="description" content="AI-powered Polymarket trading bot" />
+  <link rel="manifest" href="/manifest.json" />
+  <title>PolyBot</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --green: #00ff88;
+      --red: #ff3355;
+      --amber: #ffaa00;
+      --blue: #00aaff;
+      --bg: #050a0e;
+      --dim: #0d1820;
+      --mid: #1a2830;
+      --border: #243040;
+      --text: #c8d8e0;
+      --muted: #556070;
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      -webkit-font-smoothing: antialiased;
+      overscroll-behavior: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      height: 100dvh;
+    }
+
+    /* ── STATUS BAR SPACER ── */
+    .status-bar {
+      height: var(--safe-top);
+      background: var(--bg);
+      flex-shrink: 0;
+    }
+
+    /* ── TOP BAR ── */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .logo {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 17px;
+      letter-spacing: 0.06em;
+    }
+    .logo span { color: var(--green); }
+
+    .mode-pill {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--dim);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    .dot { width: 6px; height: 6px; border-radius: 50%; animation: blink 2s infinite; }
+    .dot.demo { background: var(--amber); }
+    .dot.live { background: var(--green); }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ── STATS STRIP ── */
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .stat {
+      padding: 10px 0;
+      text-align: center;
+      border-right: 1px solid var(--border);
+    }
+    .stat:last-child { border-right: none; }
+
+    .stat-label {
+      font-size: 8px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 3px;
+    }
+
+    .stat-val {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 15px;
+    }
+    .green { color: var(--green); }
+    .red   { color: var(--red); }
+    .amber { color: var(--amber); }
+    .blue  { color: var(--blue); }
+
+    /* ── TAB BAR ── */
+    .tabbar {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .tabbar::-webkit-scrollbar { display: none; }
+
+    .tab {
+      flex: 1;
+      padding: 10px 4px;
+      text-align: center;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      white-space: nowrap;
+      -webkit-tap-highlight-color: transparent;
+      transition: color .15s;
+    }
+    .tab.active { color: var(--green); border-bottom-color: var(--green); }
+
+    /* ── SCROLLABLE CONTENT ── */
+    .content {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+    }
+
+    /* ── ACTION ROW ── */
+    .action-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+
+    .btn {
+      font-family: 'Space Mono', monospace;
+      font-size: 11px;
+      padding: 9px 16px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: all .15s;
+      letter-spacing: .04em;
+    }
+    .btn:active { transform: scale(.97); }
+    .btn.primary { background: var(--green); border-color: var(--green); color: #050a0e; font-weight: 700; }
+    .btn.danger  { border-color: var(--red); color: var(--red); }
+    .btn:disabled { opacity: .4; }
+
+    /* ── MARKET CARDS ── */
+    .market-card {
+      padding: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .market-q {
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 8px;
+    }
+
+    .market-meta {
+      display: flex;
+      gap: 10px;
+      font-size: 9px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .prob-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .prob-bar {
+      flex: 1;
+      height: 5px;
+      background: var(--mid);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .prob-fill { height: 100%; border-radius: 3px; background: var(--green); transition: width .3s; }
+
+    .prob-num {
+      font-family: 'Syne', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    .badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .08em;
+      padding: 3px 8px;
+      border-radius: 4px;
+    }
+    .badge.yes { background: rgba(0,255,136,.12); color: var(--green); border: 1px solid rgba(0,255,136,.3); }
+    .badge.no  { background: rgba(255,51,85,.12);  color: var(--red);   border: 1px solid rgba(255,51,85,.3); }
+    .badge.skip{ background: rgba(255,170,0,.08);  color: var(--amber); border: 1px solid rgba(255,170,0,.3); }
+    .badge.pending { background: var(--mid); color: var(--muted); border: 1px solid var(--border); }
+
+    .reasoning {
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.6;
+      margin: 6px 0;
+      font-style: italic;
+    }
+
+    .signals {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 6px;
+    }
+
+    .signal-tag {
+      font-size: 9px;
+      padding: 2px 7px;
+      border-radius: 3px;
+      background: rgba(0,170,255,.07);
+      border: 1px solid rgba(0,170,255,.2);
+      color: var(--blue);
+      line-height: 1.6;
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    /* ── TRADES ── */
+    .trade-item {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .trade-info { flex: 1; min-width: 0; }
+    .trade-q { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .trade-sub { font-size: 9px; color: var(--muted); margin-top: 2px; }
+
+    .trade-side {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 3px;
+    }
+    .trade-side.yes { background: rgba(0,255,136,.1); color: var(--green); }
+    .trade-side.no  { background: rgba(255,51,85,.1);  color: var(--red); }
+
+    .trade-pnl {
+      font-family: 'Syne', sans-serif;
+      font-weight: 800;
+      font-size: 14px;
+      min-width: 54px;
+      text-align: right;
+    }
+
+    /* ── LOG ── */
+    .log-wrap { padding: 10px 14px; }
+    .log-line {
+      font-size: 10px;
+      line-height: 1.9;
+      padding-left: 10px;
+      border-left: 2px solid var(--border);
+      margin-bottom: 2px;
+      color: var(--muted);
+    }
+    .log-line.success { border-color: var(--green); color: #88ddaa; }
+    .log-line.error   { border-color: var(--red);   color: #ff8899; }
+    .log-line.info    { border-color: var(--blue);   color: #88bbdd; }
+    .log-line.ai      { border-color: var(--amber);  color: #ddaa66; }
+
+    /* ── CONFIG ── */
+    .config-wrap { padding: 14px; display: flex; flex-direction: column; gap: 14px; }
+
+    .field label {
+      display: block;
+      font-size: 9px;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .field input {
+      width: 100%;
+      background: var(--mid);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Space Mono', monospace;
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 6px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .field input:focus { border-color: var(--green); }
+
+    .config-note {
+      font-size: 10px;
+      color: var(--muted);
+      line-height: 1.7;
+      padding: 10px 12px;
+      background: var(--dim);
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+
+    /* ── BOTTOM NAV ── */
+    .bottom-nav {
+      display: flex;
+      border-top: 1px solid var(--border);
+      background: var(--bg);
+      flex-shrink: 0;
+      padding-bottom: var(--safe-bottom);
+    }
+
+    .nav-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 10px 4px 8px;
+      font-size: 8px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: color .15s;
+      gap: 4px;
+    }
+    .nav-item.active { color: var(--green); }
+    .nav-icon { font-size: 18px; line-height: 1; }
+
+    /* ── WARN BOX ── */
+    .warn-box {
+      margin: 12px 14px;
+      padding: 10px 12px;
+      background: rgba(255,170,0,.07);
+      border: 1px solid rgba(255,170,0,.25);
+      border-radius: 6px;
+      font-size: 10px;
+      color: var(--amber);
+      line-height: 1.6;
+    }
+
+    /* ── SPINNER ── */
+    .spin {
+      display: inline-block;
+      width: 11px; height: 11px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .empty {
+      text-align: center;
+      color: var(--muted);
+      font-size: 12px;
+      padding: 48px 24px;
+      line-height: 1.7;
+    }
+
+    .search-tag {
+      font-size: 9px;
+      color: var(--blue);
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+    }
+  </style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ── CONFIG ──────────────────────────────────────────────
+const MODEL = "claude-sonnet-4-20250514";
+
+const MOCK_MARKETS = [
+  { id:"m1", question:"Will Bitcoin exceed $100,000 before June 2026?",            yesProb:.61, volume:2840000, endDate:"2026-06-01" },
+  { id:"m2", question:"Will the Federal Reserve cut rates at the May 2026 meeting?",yesProb:.38, volume:1230000, endDate:"2026-05-10" },
+  { id:"m3", question:"Will Ethereum ETF net inflows exceed $1B in April 2026?",    yesProb:.44, volume:890000,  endDate:"2026-04-30" },
+  { id:"m4", question:"Will Trump sign an executive order on crypto before July 2026?", yesProb:.72, volume:670000, endDate:"2026-07-01" },
+  { id:"m5", question:"Will Apple announce a foldable iPhone at WWDC 2026?",        yesProb:.19, volume:440000, endDate:"2026-06-15" },
+];
+
+// ── STATE ────────────────────────────────────────────────
+let state = {
+  tab: "markets",
+  mode: "demo",
+  markets: MOCK_MARKETS,
+  analyses: {},
+  scanning: false,
+  autoRunning: false,
+  trades: [],
+  balance: 1500,
+  log: [{ type:"info", text:"Bot zainicjalizowany — DEMO MODE." }],
+  config: { maxBet:"10", minEdge:"5", apiKey:"", polyKey:"" },
+};
+
+let autoTimer = null;
+
+// ── HELPERS ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+function fmtUSD(n) { return "$" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+function fmtVol(n) { return n>=1e6 ? "$"+(n/1e6).toFixed(1)+"M" : "$"+(n/1e3).toFixed(0)+"K"; }
+function ts() { return new Date().toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit",second:"2-digit"}); }
+
+function addLog(text, type="info") {
+  state.log.push({ type, text:`[${ts()}] ${text}` });
+  if (state.tab === "log") renderLog();
+}
+
+// ── CLAUDE API ───────────────────────────────────────────
+async function analyzeMarket(market) {
+  const prompt = `You are a professional prediction market analyst with web search access.
+
+Analyze this Polymarket market using REAL current news and data.
+
+Market: "${market.question}"
+Current YES probability: ${(market.yesProb*100).toFixed(0)}%
+Volume: ${fmtVol(market.volume)}
+Resolution date: ${market.endDate}
+Today: ${new Date().toLocaleDateString("en-US")}
+
+Steps:
+1. Search the web for the most recent news, decisions, statements related to this question.
+2. Identify key signals: company announcements, political decisions, economic data, expert forecasts.
+3. Estimate your own probability based on evidence.
+4. Compare to market probability to find edge.
+
+Respond ONLY with valid JSON (no markdown, no backticks):
+{
+  "recommendation": "BUY_YES" | "BUY_NO" | "SKIP",
+  "confidence": <0-100>,
+  "edge": <edge in percentage points, positive = you have edge>,
+  "fair_prob": <your probability estimate 0.0-1.0>,
+  "reasoning": "<2-3 sentences on key signals and why edge exists or not>",
+  "signals": ["<signal 1>", "<signal 2>", "<signal 3>"]
+}`;
+
+  const resp = await fetch("/.netlify/functions/claude", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: [{ role: "user", content: prompt }] }),
+  });
+
+  if (!resp.ok) {
+    const errText = await resp.text();
+    let errMsg = "HTTP " + resp.status;
+    try { errMsg = JSON.parse(errText).error || errMsg; } catch {}
+    throw new Error(errMsg);
+  }
+
+  const data = await resp.json();
+  if (data.error) throw new Error(typeof data.error === "string" ? data.error : (data.error.message || JSON.stringify(data.error)));
+
+  const textBlock = data.content?.find(b => b.type === "text");
+  const raw = textBlock?.text || "{}";
+
+  // Extract JSON even if Claude adds extra text around it
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("Brak JSON w odpowiedzi Claude: " + raw.slice(0, 100));
+  const result = JSON.parse(jsonMatch[0]);
+  result._searches = data.content?.filter(b => b.type === "tool_use" && b.name === "web_search").length || 0;
+  return result;
+}
+
+async function scanAll() {
+  if (state.scanning) return;
+  state.scanning = true;
+  render();
+  addLog("Skanowanie rynków z Claude AI + web search...", "ai");
+
+  for (const m of state.markets) {
+    addLog(`🔍 Analizuję: "${m.question.slice(0,55)}..."`, "ai");
+    try {
+      const r = await analyzeMarket(m);
+      state.analyses[m.id] = r;
+      const srch = r._searches ? ` [${r._searches} searches]` : "";
+      addLog(`✓ ${m.question.slice(0,38)}: ${r.recommendation} edge:${r.edge>0?"+":""}${r.edge}% conf:${r.confidence}%${srch}`, "success");
+      if (r.signals?.length) r.signals.forEach(s => addLog(`  📡 ${s}`, "ai"));
+    } catch(e) {
+      addLog(`✗ Błąd: ${e.message}`, "error");
+      state.analyses[m.id] = { recommendation:"SKIP", confidence:0, edge:0, reasoning:"Błąd API", fair_prob:m.yesProb, signals:[], _searches:0 };
+    }
+    if (state.tab === "markets") renderMarkets();
+  }
+
+  state.scanning = false;
+  addLog("Skanowanie zakończone.", "success");
+  render();
+}
+
+function placeBet(marketId) {
+  const market = state.markets.find(m => m.id === marketId);
+  const a = state.analyses[marketId];
+  if (!market || !a) return;
+
+  const minEdge = parseFloat(state.config.minEdge) || 5;
+  const maxBet  = parseFloat(state.config.maxBet) || 10;
+
+  if (Math.abs(a.edge) < minEdge) {
+    addLog(`SKIP — edge ${a.edge}% < min ${minEdge}%`, "info");
+    return;
+  }
+  if (state.balance < 1) { addLog("Brak środków!", "error"); return; }
+
+  const side  = a.recommendation === "BUY_YES" ? "YES" : "NO";
+  const price = side === "YES" ? market.yesProb : 1 - market.yesProb;
+  const bet   = Math.min(maxBet, state.balance * 0.05);
+
+  state.trades.unshift({
+    id: Date.now(), marketId, question: market.question,
+    side, betSize: bet, price, timestamp: ts(), status:"OPEN", pnl: null,
+  });
+  state.balance -= bet;
+  addLog(`✓ BET ${side} @ ${(price*100).toFixed(0)}¢ — ${fmtUSD(bet)} | "${market.question.slice(0,40)}..."`, "success");
+  render();
+}
+
+function toggleAuto() {
+  if (state.autoRunning) {
+    clearInterval(autoTimer);
+    state.autoRunning = false;
+    addLog("Auto-trading zatrzymany.", "info");
+    render();
+    return;
+  }
+  state.autoRunning = true;
+  addLog("▶ Auto-trading aktywny (co 60s).", "success");
+  render();
+
+  const run = async () => {
+    await scanAll();
+    state.markets.forEach(m => {
+      const a = state.analyses[m.id];
+      if (a && a.recommendation !== "SKIP" && state.balance >= parseFloat(state.config.maxBet)) {
+        placeBet(m.id);
+      }
+    });
+  };
+  run();
+  autoTimer = setInterval(run, 60000);
+}
+
+// ── RENDER ───────────────────────────────────────────────
+function render() {
+  document.getElementById("app").innerHTML = buildApp();
+  attachHandlers();
+}
+
+function buildApp() {
+  const totalPnl  = state.trades.reduce((s,t) => s + (t.pnl || 0), 0);
+  const openCount = state.trades.filter(t => t.status === "OPEN").length;
+  const closed    = state.trades.filter(t => t.pnl !== null);
+  const winRate   = closed.length ? (closed.filter(t => t.pnl > 0).length / closed.length * 100) : 0;
+
+  return `
+  <div class="status-bar"></div>
+
+  <div class="topbar">
+    <div class="logo">POLY<span>BOT</span></div>
+    <div class="mode-pill" id="modeToggle">
+      <div class="dot ${state.mode}"></div>
+      ${state.mode === "demo" ? "DEMO" : "LIVE"}
+    </div>
+  </div>
+
+  ${state.mode === "live" ? `<div class="warn-box">⚠ LIVE MODE — ustaw klucze API w Ustawieniach przed użyciem.</div>` : ""}
+
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">Saldo</div>
+      <div class="stat-val ${state.balance >= 1500 ? "green" : "amber"}">${fmtUSD(state.balance)}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Otwarte</div>
+      <div class="stat-val blue">${openCount}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">P&amp;L</div>
+      <div class="stat-val ${totalPnl >= 0 ? "green" : "red"}">${totalPnl >= 0 ? "+" : ""}${fmtUSD(totalPnl)}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">Win %</div>
+      <div class="stat-val amber">${winRate.toFixed(0)}%</div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    ${["markets","trades","log","settings"].map(t => `
+      <div class="tab ${state.tab===t?"active":""}" data-tab="${t}">
+        ${t==="markets"?"Rynki":t==="trades"?"Zlecenia":t==="log"?"Log":"Ustawienia"}
+      </div>`).join("")}
+  </div>
+
+  <div class="content" id="mainContent">
+    ${state.tab === "markets"  ? buildMarkets()  : ""}
+    ${state.tab === "trades"   ? buildTrades()   : ""}
+    ${state.tab === "log"      ? buildLog()      : ""}
+    ${state.tab === "settings" ? buildSettings() : ""}
+  </div>
+
+  <div class="bottom-nav">
+    ${[
+      {id:"markets",  icon:"📊", label:"Rynki"},
+      {id:"trades",   icon:"💼", label:"Zlecenia"},
+      {id:"log",      icon:"📋", label:"Log"},
+      {id:"settings", icon:"⚙️", label:"Ustaw"},
+    ].map(n => `
+      <div class="nav-item ${state.tab===n.id?"active":""}" data-tab="${n.id}">
+        <div class="nav-icon">${n.icon}</div>
+        <div>${n.label}</div>
+      </div>`).join("")}
+  </div>`;
+}
+
+function buildMarkets() {
+  return `
+  <div class="action-row">
+    <button class="btn primary" id="scanBtn" ${state.scanning?"disabled":""}>
+      ${state.scanning ? `<span class="spin"></span>Analizuję...` : "⟳ Skanuj AI"}
+    </button>
+    <button class="btn ${state.autoRunning?"danger":""}" id="autoBtn" ${state.scanning?"disabled":""}>
+      ${state.autoRunning ? "■ Stop Auto" : "▶ Auto"}
+    </button>
+    ${state.autoRunning ? `<span style="font-size:10px;color:var(--green);align-self:center"><span class="spin"></span>Aktywny</span>` : ""}
+  </div>
+  ${state.markets.map(m => {
+    const a = state.analyses[m.id];
+    const pct = (m.yesProb * 100).toFixed(0);
+    let badgeClass = "pending", badgeText = "PENDING";
+    if (a) {
+      if (a.recommendation === "BUY_YES") { badgeClass="yes"; badgeText=`BUY YES +${a.edge}%`; }
+      else if (a.recommendation === "BUY_NO") { badgeClass="no"; badgeText=`BUY NO +${Math.abs(a.edge)}%`; }
+      else { badgeClass="skip"; badgeText="SKIP"; }
+    }
+    return `
+    <div class="market-card">
+      <div class="market-q">${m.question}</div>
+      <div class="market-meta">
+        <span>Vol: ${fmtVol(m.volume)}</span>
+        <span>Do: ${m.endDate}</span>
+        ${a && a._searches > 0 ? `<span class="search-tag">🔍 ${a._searches} searches</span>` : ""}
+      </div>
+      <div class="prob-row">
+        <div class="prob-bar"><div class="prob-fill" style="width:${pct}%;background:${m.yesProb>.5?"var(--green)":"var(--red)"}"></div></div>
+        <div class="prob-num" style="color:${m.yesProb>.5?"var(--green)":"var(--red)"}">${pct}%</div>
+        <span class="badge ${badgeClass}">${badgeText}</span>
+      </div>
+      ${a && a.reasoning ? `<div class="reasoning">${a.reasoning}</div>` : ""}
+      ${a && a.signals?.length ? `<div class="signals">${a.signals.map(s=>`<span class="signal-tag">📡 ${s}</span>`).join("")}</div>` : ""}
+      ${a && a.recommendation !== "SKIP" ? `
+      <div class="card-actions">
+        <button class="btn primary" style="font-size:11px;padding:8px 14px" data-bet="${m.id}">
+          Postaw ${state.mode==="demo"?"(demo)":""}
+        </button>
+        <span style="font-size:10px;color:var(--muted);align-self:center">
+          AI fair: ${a ? (a.fair_prob*100).toFixed(0)+"%" : "—"} | conf: ${a?.confidence ?? "—"}%
+        </span>
+      </div>` : ""}
+    </div>`;
+  }).join("")}`;
+}
+
+function buildTrades() {
+  if (!state.trades.length) return `<div class="empty">Brak zleceń.<br>Uruchom skan i postaw zakład.</div>`;
+  return state.trades.map(t => `
+  <div class="trade-item">
+    <div class="trade-info">
+      <div class="trade-q">${t.question}</div>
+      <div class="trade-sub">${t.timestamp} · ${fmtUSD(t.betSize)} @ ${(t.price*100).toFixed(0)}¢</div>
+    </div>
+    <span class="trade-side ${t.side.toLowerCase()}">${t.side}</span>
+    <div class="trade-pnl ${t.pnl===null?"":t.pnl>=0?"green":"red"}">
+      ${t.pnl===null ? "OPEN" : (t.pnl>=0?"+":"")+fmtUSD(t.pnl)}
+    </div>
+  </div>`).join("");
+}
+
+function buildLog() {
+  return `<div class="log-wrap" id="logWrap">
+    ${state.log.map(e => `<div class="log-line ${e.type}">${e.text}</div>`).join("")}
+  </div>`;
+}
+
+function buildSettings() {
+  return `<div class="config-wrap">
+    <div class="field">
+      <label>Max zakład na transakcję ($)</label>
+      <input type="number" id="cfgMaxBet" value="${state.config.maxBet}" placeholder="10" inputmode="decimal" />
+    </div>
+    <div class="field">
+      <label>Minimalny edge (%)</label>
+      <input type="number" id="cfgMinEdge" value="${state.config.minEdge}" placeholder="5" inputmode="decimal" />
+    </div>
+    <div class="field">
+      <label>Claude API Key (opcjonalny)</label>
+      <input type="password" id="cfgApiKey" value="${state.config.apiKey}" placeholder="sk-ant-..." />
+    </div>
+    <div class="field">
+      <label>Polymarket API Key (tylko LIVE)</label>
+      <input type="password" id="cfgPolyKey" value="${state.config.polyKey}" placeholder="Klucz z Polymarket API" />
+    </div>
+    <button class="btn primary" id="saveConfig">Zapisz ustawienia</button>
+    <div class="config-note">
+      W DEMO MODE klucze nie są wymagane. Klucz Claude API jest opcjonalny — bot korzysta z wbudowanego proxy. Klucz Polymarket jest potrzebny tylko w trybie LIVE do składania prawdziwych zleceń przez CLOB API.
+    </div>
+  </div>`;
+}
+
+function renderMarkets() {
+  const el = document.getElementById("mainContent");
+  if (el && state.tab === "markets") el.innerHTML = buildMarkets();
+  attachHandlers();
+}
+
+function renderLog() {
+  const el = document.getElementById("mainContent");
+  if (el && state.tab === "log") {
+    el.innerHTML = buildLog();
+    const wrap = document.getElementById("logWrap");
+    if (wrap) wrap.scrollTop = wrap.scrollHeight;
+  }
+}
+
+function attachHandlers() {
+  // Tabs
+  document.querySelectorAll("[data-tab]").forEach(el => {
+    el.addEventListener("click", () => { state.tab = el.dataset.tab; render(); });
+  });
+
+  // Mode toggle
+  const modeBtn = document.getElementById("modeToggle");
+  if (modeBtn) modeBtn.addEventListener("click", () => {
+    state.mode = state.mode === "demo" ? "live" : "demo";
+    addLog(state.mode === "live" ? "⚠ Przełączono na LIVE MODE." : "Przełączono na DEMO MODE.", state.mode === "live" ? "error" : "info");
+    render();
+  });
+
+  // Scan
+  const scanBtn = document.getElementById("scanBtn");
+  if (scanBtn) scanBtn.addEventListener("click", scanAll);
+
+  // Auto
+  const autoBtn = document.getElementById("autoBtn");
+  if (autoBtn) autoBtn.addEventListener("click", toggleAuto);
+
+  // Bet buttons
+  document.querySelectorAll("[data-bet]").forEach(el => {
+    el.addEventListener("click", () => placeBet(el.dataset.bet));
+  });
+
+  // Config save
+  const saveBtn = document.getElementById("saveConfig");
+  if (saveBtn) saveBtn.addEventListener("click", () => {
+    state.config.maxBet  = document.getElementById("cfgMaxBet")?.value  || "10";
+    state.config.minEdge = document.getElementById("cfgMinEdge")?.value || "5";
+    state.config.apiKey  = document.getElementById("cfgApiKey")?.value  || "";
+    state.config.polyKey = document.getElementById("cfgPolyKey")?.value || "";
+    addLog("Ustawienia zapisane.", "success");
+    render();
+  });
+}
+
+// ── SERVICE WORKER ───────────────────────────────────────
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js").catch(() => {});
+}
+
+// ── BOOT ─────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
